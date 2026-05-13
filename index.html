@@ -1,1 +1,778 @@
+<!DOCTYPE html>
 
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Posto Carvalho — Gestão</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,300&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #f7f3ed;
+  --surface: #ffffff;
+  --surface2: #f0ebe3;
+  --border: #ddd8cf;
+  --text: #1a1714;
+  --muted: #8a8278;
+  --yellow: #e8a800;
+  --yellow-light: #fff3cc;
+  --orange: #d4590a;
+  --red: #c0392b;
+  --red-light: #fdecea;
+  --green: #1a7a4a;
+  --green-light: #e6f5ee;
+  --blue: #1a4a8a;
+  --blue-light: #e6eef9;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px; line-height:1.5; min-height:100vh; }
+
+/* HEADER */
+.app-header { background:var(–text); padding:0 20px; position:sticky; top:0; z-index:100; display:flex; align-items:center; justify-content:space-between; height:56px; }
+.app-logo { font-family:‘Bebas Neue’,sans-serif; font-size:22px; color:var(–yellow); letter-spacing:2px; }
+.sync-status { font-family:‘DM Mono’,monospace; font-size:10px; letter-spacing:1px; display:flex; align-items:center; gap:6px; }
+.sync-dot { width:7px; height:7px; border-radius:50%; background:var(–green); }
+.sync-dot.loading { background:var(–yellow); animation:pulse 1s infinite; }
+.sync-dot.error { background:var(–red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* TABS */
+.tab-nav { background:var(–text); border-top:1px solid #333; display:flex; overflow-x:auto; scrollbar-width:none; padding:0 8px; }
+.tab-nav::-webkit-scrollbar { display:none; }
+.tab-btn { flex-shrink:0; padding:10px 16px; background:none; border:none; color:#666; font-family:‘DM Mono’,monospace; font-size:10px; font-weight:500; letter-spacing:1px; text-transform:uppercase; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; white-space:nowrap; }
+.tab-btn.active { color:var(–yellow); border-bottom-color:var(–yellow); }
+
+/* PANELS */
+.panel { display:none; padding:20px; max-width:800px; margin:0 auto; }
+.panel.active { display:block; }
+
+/* CARD */
+.card { background:var(–surface); border:1px solid var(–border); border-radius:10px; padding:20px; margin-bottom:16px; }
+.card-title { font-family:‘Bebas Neue’,sans-serif; font-size:20px; letter-spacing:1px; color:var(–text); margin-bottom:4px; }
+.card-sub { font-size:12px; color:var(–muted); font-family:‘DM Mono’,monospace; margin-bottom:16px; }
+
+/* FORM */
+label { display:block; font-size:11px; font-weight:500; color:var(–muted); font-family:‘DM Mono’,monospace; letter-spacing:0.5px; margin-bottom:5px; text-transform:uppercase; }
+input, select, textarea { width:100%; background:var(–surface2); border:1.5px solid var(–border); border-radius:8px; padding:10px 14px; font-size:15px; font-family:‘DM Sans’,sans-serif; color:var(–text); outline:none; transition:border-color 0.15s; }
+input:focus, select:focus, textarea:focus { border-color:var(–yellow); background:#fff; }
+.input-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+.input-group { margin-bottom:14px; }
+
+/* BUTTON */
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:11px 20px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; border:none; transition:all 0.15s; font-family:‘DM Sans’,sans-serif; }
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-primary { background:var(–text); color:var(–yellow); }
+.btn-primary:hover:not(:disabled) { background:#333; }
+.btn-secondary { background:var(–surface2); color:var(–text); border:1.5px solid var(–border); }
+.btn-danger { background:var(–red-light); color:var(–red); border:none; }
+.btn-green { background:var(–green-light); color:var(–green); }
+.btn-full { width:100%; }
+
+/* SUMMARY */
+.summary-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+.summary-card { background:var(–surface2); border-radius:8px; padding:14px; text-align:center; }
+.summary-val { font-family:‘Bebas Neue’,sans-serif; font-size:28px; color:var(–text); line-height:1; }
+.summary-val.yellow { color:var(–yellow); }
+.summary-val.green { color:var(–green); }
+.summary-val.orange { color:var(–orange); }
+.summary-lbl { font-family:‘DM Mono’,monospace; font-size:9px; color:var(–muted); letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
+
+/* PROGRESS */
+.progress-wrap { background:var(–surface2); border-radius:20px; height:8px; overflow:hidden; margin-top:8px; }
+.progress-bar { height:100%; border-radius:20px; background:linear-gradient(90deg,var(–yellow),var(–orange)); transition:width 0.4s ease; }
+
+/* ALERT */
+.alert-box { border-radius:8px; padding:14px 16px; margin-bottom:14px; display:flex; gap:10px; align-items:flex-start; }
+.alert-box.yellow { background:var(–yellow-light); border:1px solid #f0d070; }
+.alert-box.green { background:var(–green-light); border:1px solid #a0d4b8; }
+.alert-box.red { background:var(–red-light); border:1px solid #f0b0b0; }
+.alert-icon { font-size:16px; flex-shrink:0; margin-top:1px; }
+.alert-text { font-size:13px; color:var(–text); line-height:1.6; }
+
+/* TABLE */
+.data-table { width:100%; border-collapse:collapse; font-size:13px; }
+.data-table th { text-align:left; padding:10px 12px; background:var(–surface2); font-size:10px; font-family:‘DM Mono’,monospace; letter-spacing:1px; text-transform:uppercase; color:var(–muted); font-weight:500; border-bottom:1px solid var(–border); }
+.data-table td { padding:10px 12px; border-bottom:1px solid var(–surface2); color:var(–text); vertical-align:middle; }
+.data-table tr:last-child td { border-bottom:none; }
+.num { text-align:right; font-family:‘DM Mono’,monospace; }
+
+/* CHECKLIST */
+.check-item { display:flex; align-items:flex-start; gap:12px; padding:13px 0; border-bottom:1px solid var(–surface2); }
+.check-item:last-child { border-bottom:none; }
+.check-item input[type=checkbox] { width:20px; height:20px; flex-shrink:0; cursor:pointer; accent-color:var(–green); margin-top:2px; }
+.check-name { font-size:14px; font-weight:500; color:var(–text); transition:all 0.15s; }
+.check-item.done .check-name { text-decoration:line-through; color:var(–muted); }
+
+/* FROTA */
+.frota-item { background:var(–surface); border:1px solid var(–border); border-radius:8px; padding:14px 16px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.frota-nome { font-size:14px; font-weight:600; color:var(–text); }
+.frota-meta { font-size:12px; color:var(–muted); font-family:‘DM Mono’,monospace; }
+
+/* SCRIPT */
+.script-section { background:var(–surface2); border-radius:8px; padding:16px; margin-bottom:12px; border-left:3px solid var(–yellow); }
+.script-label { font-family:‘DM Mono’,monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(–orange); font-weight:500; margin-bottom:8px; }
+.script-text { font-size:14px; color:var(–text); line-height:1.7; font-style:italic; }
+.script-note { margin-top:8px; font-size:12px; color:var(–muted); font-style:normal; }
+
+/* VOL BAR */
+.vol-bar-wrap { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.vol-bar-label { font-family:‘DM Mono’,monospace; font-size:11px; color:var(–muted); width:70px; flex-shrink:0; }
+.vol-bar-bg { flex:1; background:var(–surface2); border-radius:4px; height:22px; overflow:hidden; }
+.vol-bar-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,var(–yellow),var(–orange)); display:flex; align-items:center; padding-left:8px; font-family:‘DM Mono’,monospace; font-size:11px; color:var(–text); font-weight:500; min-width:30px; transition:width 0.5s ease; }
+.vol-bar-pct { font-family:‘DM Mono’,monospace; font-size:12px; font-weight:600; width:50px; text-align:right; flex-shrink:0; }
+
+/* SECTION TITLE */
+.section-title { font-family:‘Bebas Neue’,sans-serif; font-size:15px; letter-spacing:1px; color:var(–muted); margin-bottom:12px; margin-top:16px; display:flex; align-items:center; gap:8px; }
+.section-title::after { content:’’; flex:1; height:1px; background:var(–border); }
+
+/* TOAST */
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(–text); color:var(–yellow); padding:12px 24px; border-radius:8px; font-family:‘DM Mono’,monospace; font-size:12px; letter-spacing:1px; z-index:999; opacity:0; transition:opacity 0.3s; pointer-events:none; }
+.toast.show { opacity:1; }
+
+@media(max-width:600px) {
+.input-row { grid-template-columns:1fr; }
+.summary-val { font-size:22px; }
+}
+</style>
+
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-logo">POSTO CARVALHO</div>
+  <div class="sync-status">
+    <div class="sync-dot loading" id="sync-dot"></div>
+    <span id="sync-label" style="color:#888">conectando...</span>
+  </div>
+</div>
+
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="showTab('volume',this)">⛽ Volume</button>
+  <button class="tab-btn" onclick="showTab('frotas',this)">🚛 Frotas</button>
+  <button class="tab-btn" onclick="showTab('script',this)">📞 Script</button>
+  <button class="tab-btn" onclick="showTab('estoque',this)">🏪 Estoque</button>
+  <button class="tab-btn" onclick="showTab('precos',this)">💰 Preços</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ===== VOLUME ===== -->
+
+<div id="tab-volume" class="panel active">
+  <div class="card">
+    <div class="card-title">Controle de Volume por Turno</div>
+    <div class="card-sub">META DIÁRIA: 3.333 LITROS · DADOS EM TEMPO REAL</div>
+    <div class="summary-row">
+      <div class="summary-card"><div class="summary-val yellow" id="v-hoje">—</div><div class="summary-lbl">Litros Hoje</div></div>
+      <div class="summary-card"><div class="summary-val green" id="v-meta">—</div><div class="summary-lbl">% da Meta</div></div>
+      <div class="summary-card"><div class="summary-val orange" id="v-mes">—</div><div class="summary-lbl">Litros no Mês</div></div>
+    </div>
+    <div class="progress-wrap" style="margin-bottom:16px"><div class="progress-bar" id="v-progress" style="width:0%"></div></div>
+
+```
+<div class="section-title">Registrar Turno</div>
+<div class="input-row">
+  <div><label>Data</label><input type="date" id="v-data"></div>
+  <div><label>Turno</label>
+    <select id="v-turno">
+      <option>Dia (07h–19h)</option>
+      <option>Noite (19h–07h)</option>
+    </select>
+  </div>
+</div>
+<div class="input-row">
+  <div><label>Gasolina Comum (L)</label><input type="number" id="v-gc" placeholder="0" min="0"></div>
+  <div><label>Gasolina Aditivada (L)</label><input type="number" id="v-ga" placeholder="0" min="0"></div>
+</div>
+<div class="input-row">
+  <div><label>Etanol (L)</label><input type="number" id="v-et" placeholder="0" min="0"></div>
+  <div><label>Diesel (L)</label><input type="number" id="v-di" placeholder="0" min="0"></div>
+</div>
+<div class="input-group">
+  <label>Faturamento Conveniência (R$)</label>
+  <input type="number" id="v-conv" placeholder="0.00" step="0.01" min="0">
+</div>
+<div class="input-group">
+  <label>Operador / Nome</label>
+  <input type="text" id="v-op" placeholder="Nome de quem está registrando">
+</div>
+<div class="input-group">
+  <label>Observações</label>
+  <textarea id="v-obs" rows="2" placeholder="Ex: chuva forte, movimento baixo..."></textarea>
+</div>
+<button class="btn btn-primary btn-full" id="v-btn" onclick="addTurno()">＋ Registrar Turno</button>
+```
+
+  </div>
+
+  <div class="card">
+    <div class="card-title">Histórico — Últimos 7 Dias</div>
+    <div id="v-chart" style="margin-bottom:16px"></div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr>
+          <th>Data</th><th>Turno</th><th>Operador</th>
+          <th class="num">Total L</th><th class="num">Conv R$</th><th></th>
+        </tr></thead>
+        <tbody id="v-tbody"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FROTAS ===== -->
+
+<div id="tab-frotas" class="panel">
+  <div class="alert-box yellow">
+    <div class="alert-icon">🎯</div>
+    <div class="alert-text"><strong>Meta da Semana:</strong> Mapear 10 frotas e contatar pelo menos 5. Uma frota de 10 caminhões = ~10.000 litros/mês garantidos.</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Adicionar Empresa / Frota</div>
+    <div class="card-sub">REGISTRE CADA POTENCIAL CLIENTE CORPORATIVO</div>
+    <div class="input-group"><label>Nome da Empresa</label><input type="text" id="f-nome" placeholder="Ex: Transportadora Norte Ltda"></div>
+    <div class="input-row">
+      <div><label>Tipo</label>
+        <select id="f-tipo">
+          <option>Transportadora</option><option>Construção Civil</option>
+          <option>Órgão Público</option><option>Cooperativa Táxi/Moto</option>
+          <option>Turismo / Ônibus</option><option>Agropecuária</option>
+          <option>Distribuição</option><option>Outro</option>
+        </select>
+      </div>
+      <div><label>Veículos Estimados</label><input type="number" id="f-veic" placeholder="Ex: 8" min="1"></div>
+    </div>
+    <div class="input-row">
+      <div><label>Contato / Responsável</label><input type="text" id="f-contato" placeholder="Nome"></div>
+      <div><label>Telefone / WhatsApp</label><input type="tel" id="f-tel" placeholder="(86) 99999-9999"></div>
+    </div>
+    <div class="input-group"><label>Status Inicial</label>
+      <select id="f-status">
+        <option>Identificado</option><option>Contato Feito</option>
+        <option>Reunião Agendada</option><option>Proposta Enviada</option>
+        <option>Fechado</option><option>Sem Interesse</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-full" id="f-btn" onclick="addFrota()">＋ Adicionar à Lista</button>
+  </div>
+  <div class="card">
+    <div class="card-title">Pipeline de Frotas</div>
+    <div class="summary-row">
+      <div class="summary-card"><div class="summary-val yellow" id="f-total">—</div><div class="summary-lbl">Empresas</div></div>
+      <div class="summary-card"><div class="summary-val green" id="f-fechados">—</div><div class="summary-lbl">Fechados</div></div>
+      <div class="summary-card"><div class="summary-val orange" id="f-potencial">—</div><div class="summary-lbl">L/Mês Pot.</div></div>
+    </div>
+    <div id="f-list"><p style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Carregando...</p></div>
+  </div>
+</div>
+
+<!-- ===== SCRIPT ===== -->
+
+<div id="tab-script" class="panel">
+  <div class="alert-box green">
+    <div class="alert-icon">💡</div>
+    <div class="alert-text"><strong>Como usar:</strong> Leia antes de ligar. O objetivo da primeira ligação é <strong>agendar uma visita</strong> — não fechar o contrato.</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Script — Ligação Inicial</div>
+    <div class="card-sub">DURAÇÃO: 2–3 MINUTOS · OBJETIVO: AGENDAR VISITA</div>
+    <div class="script-section">
+      <div class="script-label">Abertura (0–15s)</div>
+      <div class="script-text">"Bom dia, posso falar com o responsável pela frota? … Olá [Nome], meu nome é [seu nome], sou proprietário do Posto Carvalho aqui em Luís Correia. Tenho 5 bombas 24 horas e estou estruturando um programa especial para frotas da região."</div>
+      <div class="script-note">💡 Se perguntarem "do que se trata?": "Estou oferecendo condições diferenciadas — preço, prazo e nota fiscal. Queria entender a necessidade de vocês antes de apresentar."</div>
+    </div>
+    <div class="script-section">
+      <div class="script-label">Levantamento (15–60s)</div>
+      <div class="script-text">"Atualmente vocês abastecem onde? … Quantos veículos têm na frota? … É diesel, gasolina ou misto? … Pagam à vista ou têm acordo de prazo?"</div>
+      <div class="script-note">💡 Anote tudo. Não ofereça preço ainda — essas respostas constroem sua proposta.</div>
+    </div>
+    <div class="script-section">
+      <div class="script-label">Proposta de Visita (60–90s)</div>
+      <div class="script-text">"Baseado no que você me disse, acredito que consigo montar uma condição interessante. Posso passar aí [amanhã / na quarta] para apresentar pessoalmente? Leva 15 minutos e já vejo se faz sentido."</div>
+      <div class="script-note">💡 Se hesitar: "Sem compromisso — só quero mostrar o que temos. Se não fizer sentido, tudo bem."</div>
+    </div>
+    <div class="script-section" style="border-left-color:var(--green)">
+      <div class="script-label" style="color:var(--green)">Fechamento</div>
+      <div class="script-text">"Ótimo! Então fica marcado [dia] às [hora]. Vou mandar meu WhatsApp agora. Qualquer coisa pode me chamar. Obrigado, [Nome]!"</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Script — Visita Presencial</div>
+    <div class="card-sub">OBJETIVO: APRESENTAR PROPOSTA E FECHAR</div>
+    <div class="script-section">
+      <div class="script-label">Abertura</div>
+      <div class="script-text">"Obrigado por me receber. Tenho 5 bombas 24 horas e quero estruturar uma parceria de longo prazo com empresas sérias da região. Vim entender melhor a operação de vocês para ver se consigo montar algo que faça sentido."</div>
+    </div>
+    <div class="script-section">
+      <div class="script-label">Oferta</div>
+      <div class="script-text">"Consigo oferecer: preço fixo por litro com desconto progressivo por volume, nota fiscal em cada abastecimento, pagamento em até 15–30 dias no boleto, e atendimento prioritário para a frota de vocês."</div>
+      <div class="script-note">💡 Calcule antes o preço mínimo que mantém sua margem. Não improvise valores.</div>
+    </div>
+    <div class="script-section">
+      <div class="script-label">Objeções Comuns</div>
+      <div class="script-text">
+        <strong>— "Já temos fornecedor":</strong> "Entendo. Não estou pedindo para trocar — só para testar por 30 dias. Se eu não entregar o que prometi, vocês voltam ao que tinham."<br><br>
+        <strong>— "Preciso de preço melhor":</strong> "Me diz o volume certo e eu recalculo. Quanto maior o volume, mais consigo melhorar."<br><br>
+        <strong>— "Vou consultar o sócio":</strong> "Claro. Posso deixar a proposta por escrito e te ligo em 2 dias?"
+      </div>
+    </div>
+    <div class="script-section" style="border-left-color:var(--green)">
+      <div class="script-label" style="color:var(--green)">Fechamento</div>
+      <div class="script-text">"Para começar, só preciso do seu CNPJ para montar o contrato — é uma página simples. Posso mandar por WhatsApp hoje e a gente já começa na semana que vem?"</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Tabela de Condições por Volume</div>
+    <div class="card-sub">REFERÊNCIA PARA PROPOSTA — AJUSTE CONFORME SUA MARGEM</div>
+    <div class="alert-box yellow"><div class="alert-icon">⚠️</div><div class="alert-text">Ajuste os valores conforme seu custo real antes de apresentar.</div></div>
+    <table class="data-table">
+      <thead><tr><th>Volume/Mês</th><th class="num">Desconto/L</th><th>Prazo</th><th>Extras</th></tr></thead>
+      <tbody>
+        <tr><td>Até 2.000 L</td><td class="num">R$ 0,03</td><td>À vista</td><td>NF garantida</td></tr>
+        <tr><td>2.001–5.000 L</td><td class="num">R$ 0,05</td><td>10 dias</td><td>NF + relatório mensal</td></tr>
+        <tr><td>5.001–10.000 L</td><td class="num">R$ 0,08</td><td>15 dias</td><td>NF + relatório + prioridade</td></tr>
+        <tr><td>Acima 10.000 L</td><td class="num">Negociar</td><td>30 dias</td><td>Pacote personalizado</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== ESTOQUE ===== -->
+
+<div id="tab-estoque" class="panel">
+  <div class="alert-box red">
+    <div class="alert-icon">🚨</div>
+    <div class="alert-text"><strong>Prioridade máxima:</strong> A conveniência caiu 74% em 4 meses. Use este checklist para identificar o problema hoje.</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Checklist — Diagnóstico da Conveniência</div>
+    <div class="card-sub" id="ck-label">CARREGANDO...</div>
+    <div class="progress-wrap" style="margin-bottom:16px"><div class="progress-bar" id="ck-progress" style="width:0%"></div></div>
+    <div id="ck-container"><p style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Carregando checklist...</p></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Anotações do Diagnóstico</div>
+    <div class="card-sub">REGISTRE O QUE ENCONTRAR — SALVO NA NUVEM</div>
+    <div class="input-group"><label>O que está em falta ou com estoque baixo?</label><textarea id="obs-falta" rows="3" placeholder="Ex: sem cerveja lata 350ml..."></textarea></div>
+    <div class="input-group"><label>Produtos com preço acima do mercado?</label><textarea id="obs-preco" rows="3" placeholder="Ex: água mais cara que o mercado..."></textarea></div>
+    <div class="input-group"><label>Produtos de baixo giro que ocupam espaço?</label><textarea id="obs-baixo" rows="3" placeholder="Ex: eletrônicos parados há meses..."></textarea></div>
+    <div class="input-group"><label>Ações imediatas identificadas</label><textarea id="obs-acoes" rows="3" placeholder="Ex: repor cerveja, negociar com fornecedor X..."></textarea></div>
+    <button class="btn btn-green btn-full" id="obs-btn" onclick="salvarObs()">💾 Salvar Observações na Nuvem</button>
+  </div>
+</div>
+
+<!-- ===== PREÇOS ===== -->
+
+<div id="tab-precos" class="panel">
+  <div class="alert-box yellow">
+    <div class="alert-icon">📌</div>
+    <div class="alert-text">Preencha os preços do Posto Carvalho e dos concorrentes. A tabela indica automaticamente onde você está mais caro.</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Preços — Combustível</div>
+    <div class="card-sub">COMPARE O PREÇO DO LITRO NA BOMBA</div>
+    <div class="input-row" style="margin-bottom:14px">
+      <div><label>Nome Concorrente 1</label><input type="text" id="cn1" placeholder="Ex: Posto Boa Vista" oninput="saveConcNome()"></div>
+      <div><label>Nome Concorrente 2</label><input type="text" id="cn2" placeholder="Ex: Posto Central" oninput="saveConcNome()"></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table" id="comb-table">
+        <thead><tr>
+          <th>Combustível</th>
+          <th class="num">Posto Carvalho</th>
+          <th class="num" id="ch1">Concorrente 1</th>
+          <th class="num" id="ch2">Concorrente 2</th>
+          <th class="num">Situação</th>
+        </tr></thead>
+        <tbody id="comb-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Preços — Conveniência</div>
+    <div class="card-sub">TOP PRODUTOS — COMPARE COM CONCORRENTES</div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr>
+          <th>Produto</th>
+          <th class="num">Posto Carvalho</th>
+          <th class="num" id="ch1b">Concorrente 1</th>
+          <th class="num" id="ch2b">Concorrente 2</th>
+          <th class="num">Situação</th>
+        </tr></thead>
+        <tbody id="conv-tbody"></tbody>
+      </table>
+    </div>
+    <button class="btn btn-primary btn-full" style="margin-top:14px" id="preco-btn" onclick="salvarPrecos()">💾 Salvar Pesquisa de Preços</button>
+  </div>
+</div>
+
+<script>
+// ===================== SUPABASE =====================
+const SUPA_URL = 'https://kdweziidnrtqeytsywni.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtkd2V6aWlkbnJ0cWV5dHN5d25pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1Mzg2NTgsImV4cCI6MjA5NDExNDY1OH0.mJgMF_vJ9qk5RYzPaEgExZieISr6BoFqZxnpFqgmn-M';
+const { createClient } = supabase;
+const db = createClient(SUPA_URL, SUPA_KEY);
+
+// ===================== STATUS =====================
+async function checkConnection() {
+  try {
+    const { error } = await db.from('turnos').select('id').limit(1);
+    if (error) throw error;
+    setSyncStatus('ok', 'conectado');
+  } catch(e) {
+    setSyncStatus('error', 'erro de conexão');
+    showToast('⚠️ Erro ao conectar ao banco de dados. Verifique as credenciais.');
+  }
+}
+
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = 'sync-dot' + (state === 'loading' ? ' loading' : state === 'error' ? ' error' : '');
+  lbl.textContent = label;
+  lbl.style.color = state === 'ok' ? '#2ecc71' : state === 'error' ? '#c0392b' : '#888';
+}
+
+function setSyncing(loading) {
+  setSyncStatus(loading ? 'loading' : 'ok', loading ? 'salvando...' : 'salvo ✓');
+}
+
+// ===================== TOAST =====================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ===================== TABS =====================
+function showTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id === 'volume') loadTurnos();
+  if (id === 'frotas') loadFrotas();
+  if (id === 'estoque') loadChecklist();
+  if (id === 'precos') buildPrecosTables();
+}
+
+// ===================== UTILS =====================
+function fmt(n) { return Number(n||0).toLocaleString('pt-BR'); }
+function fmtR(n) { return 'R$\u00a0' + Number(n||0).toFixed(2).replace('.',','); }
+function today() { return new Date().toISOString().split('T')[0]; }
+function monthPrefix() { return today().substring(0,7); }
+
+// ===================== VOLUME =====================
+document.getElementById('v-data').value = today();
+
+async function addTurno() {
+  const btn = document.getElementById('v-btn');
+  const data = document.getElementById('v-data').value;
+  if (!data) { showToast('Selecione a data.'); return; }
+  const gc = parseFloat(document.getElementById('v-gc').value)||0;
+  const ga = parseFloat(document.getElementById('v-ga').value)||0;
+  const et = parseFloat(document.getElementById('v-et').value)||0;
+  const di = parseFloat(document.getElementById('v-di').value)||0;
+  const conv = parseFloat(document.getElementById('v-conv').value)||0;
+  const op = document.getElementById('v-op').value.trim();
+  const obs = document.getElementById('v-obs').value.trim();
+
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  setSyncing(true);
+  const { error } = await db.from('turnos').insert([{
+    data, turno: document.getElementById('v-turno').value,
+    gas_comum:gc, gas_aditivada:ga, etanol:et, diesel:di,
+    conv_faturamento:conv, operador:op, observacoes:obs
+  }]);
+  btn.disabled = false; btn.textContent = '＋ Registrar Turno';
+  if (error) { setSyncStatus('error','erro'); showToast('Erro ao salvar: ' + error.message); return; }
+  setSyncing(false);
+  ['v-gc','v-ga','v-et','v-di','v-conv','v-obs'].forEach(id => document.getElementById(id).value='');
+  showToast('✓ Turno registrado com sucesso!');
+  loadTurnos();
+}
+
+async function loadTurnos() {
+  const { data, error } = await db.from('turnos')
+    .select('*').order('data', {ascending:false}).order('created_at',{ascending:false}).limit(50);
+  if (error) { setSyncStatus('error','erro'); return; }
+  setSyncStatus('ok','conectado');
+
+  // summaries
+  const todayData = (data||[]).filter(t => t.data === today());
+  const todayL = todayData.reduce((s,t) => s + (t.total_litros||0), 0);
+  const mesData = (data||[]).filter(t => (t.data||'').startsWith(monthPrefix()));
+  const mesL = mesData.reduce((s,t) => s + (t.total_litros||0), 0);
+  const pct = Math.round(todayL/3333*100);
+  document.getElementById('v-hoje').textContent = fmt(Math.round(todayL));
+  document.getElementById('v-meta').textContent = pct + '%';
+  document.getElementById('v-mes').textContent = fmt(Math.round(mesL));
+  document.getElementById('v-progress').style.width = Math.min(100,pct) + '%';
+
+  // chart — last 7 days with data
+  const byDate = {};
+  (data||[]).forEach(t => { byDate[t.data] = (byDate[t.data]||0) + (t.total_litros||0); });
+  const dates = Object.keys(byDate).sort().slice(-7);
+  const maxV = Math.max(...dates.map(d => byDate[d]), 3333);
+  document.getElementById('v-chart').innerHTML = dates.map(d => {
+    const pct = Math.min(100, Math.round(byDate[d]/maxV*100));
+    const ok = byDate[d] >= 3333;
+    const parts = d.split('-');
+    return `<div class="vol-bar-wrap">
+      <div class="vol-bar-label">${parts[2]}/${parts[1]}</div>
+      <div class="vol-bar-bg"><div class="vol-bar-fill" style="width:${pct}%">${fmt(Math.round(byDate[d]))}L</div></div>
+      <div class="vol-bar-pct" style="color:${ok?'var(--green)':'var(--orange)'}">${ok?'✓':''}${Math.round(byDate[d]/3333*100)}%</div>
+    </div>`;
+  }).join('') || '<p style="color:var(--muted);font-size:13px;padding:10px">Nenhum registro ainda.</p>';
+
+  // table
+  document.getElementById('v-tbody').innerHTML = (data||[]).slice(0,20).map(t => `
+    <tr>
+      <td>${(t.data||'').split('-').reverse().join('/')}</td>
+      <td style="font-size:12px">${t.turno||'—'}</td>
+      <td style="font-size:12px">${t.operador||'—'}</td>
+      <td class="num"><strong>${fmt(Math.round(t.total_litros||0))}</strong></td>
+      <td class="num">${t.conv_faturamento ? fmtR(t.conv_faturamento) : '—'}</td>
+      <td><button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="deleteTurno('${t.id}')">✕</button></td>
+    </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Nenhum registro ainda.</td></tr>';
+}
+
+async function deleteTurno(id) {
+  if (!confirm('Excluir este registro?')) return;
+  setSyncing(true);
+  await db.from('turnos').delete().eq('id', id);
+  setSyncing(false);
+  showToast('Registro removido.');
+  loadTurnos();
+}
+
+// ===================== FROTAS =====================
+async function addFrota() {
+  const nome = document.getElementById('f-nome').value.trim();
+  if (!nome) { showToast('Digite o nome da empresa.'); return; }
+  const btn = document.getElementById('f-btn');
+  btn.disabled=true; btn.textContent='Salvando...';
+  setSyncing(true);
+  const { error } = await db.from('frotas').insert([{
+    nome, tipo: document.getElementById('f-tipo').value,
+    veiculos: parseInt(document.getElementById('f-veic').value)||0,
+    contato: document.getElementById('f-contato').value.trim(),
+    telefone: document.getElementById('f-tel').value.trim(),
+    status: document.getElementById('f-status').value
+  }]);
+  btn.disabled=false; btn.textContent='＋ Adicionar à Lista';
+  if (error) { setSyncStatus('error','erro'); showToast('Erro: '+error.message); return; }
+  setSyncing(false);
+  ['f-nome','f-contato','f-tel','f-veic'].forEach(id => document.getElementById(id).value='');
+  showToast('✓ Empresa adicionada!');
+  loadFrotas();
+}
+
+async function updateFrotaStatus(id, val) {
+  setSyncing(true);
+  await db.from('frotas').update({ status:val, updated_at: new Date().toISOString() }).eq('id',id);
+  setSyncing(false);
+  loadFrotas();
+}
+
+async function deleteFrota(id) {
+  if (!confirm('Remover esta empresa?')) return;
+  setSyncing(true);
+  await db.from('frotas').delete().eq('id',id);
+  setSyncing(false);
+  showToast('Empresa removida.');
+  loadFrotas();
+}
+
+async function loadFrotas() {
+  const { data, error } = await db.from('frotas').select('*').order('created_at',{ascending:false});
+  if (error) return;
+  const total = (data||[]).length;
+  const veic = (data||[]).reduce((s,f) => s+(f.veiculos||0),0);
+  const fechados = (data||[]).filter(f => f.status==='Fechado').length;
+  const pot = veic*1000;
+  document.getElementById('f-total').textContent = total;
+  document.getElementById('f-fechados').textContent = fechados;
+  document.getElementById('f-potencial').textContent = Math.round(pot/1000)+'K';
+
+  document.getElementById('f-list').innerHTML = !total
+    ? '<p style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Nenhuma empresa cadastrada ainda.</p>'
+    : (data||[]).map(f => `
+    <div class="frota-item">
+      <div style="flex:1">
+        <div class="frota-nome">${f.nome}</div>
+        <div class="frota-meta">${f.tipo} · ${f.veiculos||0} veíc. · ~${fmt((f.veiculos||0)*1000)} L/mês</div>
+        ${f.contato ? `<div class="frota-meta" style="margin-top:2px">👤 ${f.contato}${f.telefone ? ' · '+f.telefone : ''}</div>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+        <select style="font-size:11px;padding:4px 8px;border-radius:6px;font-family:'DM Mono',monospace" onchange="updateFrotaStatus('${f.id}',this.value)">
+          ${['Identificado','Contato Feito','Reunião Agendada','Proposta Enviada','Fechado','Sem Interesse'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="deleteFrota('${f.id}')">Remover</button>
+      </div>
+    </div>`).join('');
+}
+
+// ===================== CHECKLIST =====================
+async function loadChecklist() {
+  const { data, error } = await db.from('checklist_items').select('*').order('created_at');
+  if (error) { document.getElementById('ck-container').innerHTML='<p style="color:var(--red)">Erro ao carregar checklist.</p>'; return; }
+  const items = data||[];
+  const total = items.length;
+  const done = items.filter(i => i.concluido).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('ck-label').textContent = `${done} DE ${total} ITENS VERIFICADOS (${pct}%)`;
+  document.getElementById('ck-progress').style.width = pct+'%';
+
+  // group by categoria
+  const cats = {};
+  items.forEach(i => { if (!cats[i.categoria]) cats[i.categoria]=[]; cats[i.categoria].push(i); });
+  let html = '';
+  for (const [cat, catItems] of Object.entries(cats)) {
+    html += `<div class="section-title">${cat}</div>`;
+    catItems.forEach(item => {
+      html += `<div class="check-item ${item.concluido?'done':''}" onclick="toggleCheck('${item.id}',${item.concluido})">
+        <input type="checkbox" ${item.concluido?'checked':''} onclick="event.stopPropagation();toggleCheck('${item.id}',${item.concluido})">
+        <div class="check-name">${item.item}</div>
+      </div>`;
+    });
+  }
+  document.getElementById('ck-container').innerHTML = html;
+
+  // load obs
+  const { data: obsData } = await db.from('anotacoes').select('*').eq('categoria','conveniencia').order('updated_at',{ascending:false}).limit(1);
+  if (obsData && obsData[0]) {
+    try {
+      const obs = JSON.parse(obsData[0].conteudo);
+      ['falta','preco','baixo','acoes'].forEach(k => {
+        if (obs[k]) document.getElementById('obs-'+k).value = obs[k];
+      });
+    } catch(e) {}
+  }
+}
+
+async function toggleCheck(id, current) {
+  setSyncing(true);
+  await db.from('checklist_items').update({ concluido: !current, updated_at: new Date().toISOString() }).eq('id',id);
+  setSyncing(false);
+  loadChecklist();
+}
+
+async function salvarObs() {
+  const btn = document.getElementById('obs-btn');
+  btn.disabled=true; btn.textContent='Salvando...';
+  const obs = {
+    falta: document.getElementById('obs-falta').value,
+    preco: document.getElementById('obs-preco').value,
+    baixo: document.getElementById('obs-baixo').value,
+    acoes: document.getElementById('obs-acoes').value
+  };
+  setSyncing(true);
+  // upsert
+  const { data: existing } = await db.from('anotacoes').select('id').eq('categoria','conveniencia').limit(1);
+  if (existing && existing[0]) {
+    await db.from('anotacoes').update({ conteudo: JSON.stringify(obs), updated_at: new Date().toISOString() }).eq('id', existing[0].id);
+  } else {
+    await db.from('anotacoes').insert([{ categoria:'conveniencia', conteudo: JSON.stringify(obs) }]);
+  }
+  setSyncing(false);
+  btn.disabled=false; btn.textContent='💾 Salvar Observações na Nuvem';
+  showToast('✓ Observações salvas na nuvem!');
+}
+
+// ===================== PREÇOS =====================
+const COMBUSTIVEIS = ['Gasolina Comum','Gasolina Aditivada','Etanol','Diesel S10'];
+const CONV_PRODUTOS = ['Água 500ml','Água 1,5L','Coca-Cola lata','Cerveja lata 350ml','Red Bull 250ml','Monster 473ml','Cigarro Marlboro','Cigarro Lucky Strike','Sorvete picolé','Salgadinho 50g','Óleo Motor 1L'];
+
+let precoCache = {};
+
+async function buildPrecosTables() {
+  const { data } = await db.from('pesquisa_precos').select('*').order('created_at',{ascending:false}).limit(100);
+  if (data) {
+    data.forEach(r => {
+      const key = r.produto+'_'+r.tipo;
+      if (!precoCache[key]) precoCache[key] = r;
+    });
+    // load conc names
+    const sample = data[0];
+    if (sample) {
+      if (sample.nome_conc1) { document.getElementById('cn1').value=sample.nome_conc1; document.getElementById('ch1').textContent=sample.nome_conc1; document.getElementById('ch1b').textContent=sample.nome_conc1; }
+      if (sample.nome_conc2) { document.getElementById('cn2').value=sample.nome_conc2; document.getElementById('ch2').textContent=sample.nome_conc2; document.getElementById('ch2b').textContent=sample.nome_conc2; }
+    }
+  }
+
+  const makeRow = (prod, tipo) => {
+    const key = prod+'_'+tipo;
+    const cached = precoCache[key]||{};
+    return `<tr>
+      <td>${prod}</td>
+      <td><input type="number" step="0.01" placeholder="0,00" value="${cached.preco_posto||''}" id="p_${tipo}_${prod}_pc" style="padding:6px 8px;font-size:12px" oninput="calcDiff('${prod}','${tipo}')"></td>
+      <td><input type="number" step="0.01" placeholder="0,00" value="${cached.preco_conc1||''}" id="p_${tipo}_${prod}_c1" style="padding:6px 8px;font-size:12px" oninput="calcDiff('${prod}','${tipo}')"></td>
+      <td><input type="number" step="0.01" placeholder="0,00" value="${cached.preco_conc2||''}" id="p_${tipo}_${prod}_c2" style="padding:6px 8px;font-size:12px" oninput="calcDiff('${prod}','${tipo}')"></td>
+      <td id="diff_${tipo}_${prod}" class="num">—</td>
+    </tr>`;
+  };
+
+  document.getElementById('comb-tbody').innerHTML = COMBUSTIVEIS.map(p => makeRow(p,'combustivel')).join('');
+  document.getElementById('conv-tbody').innerHTML = CONV_PRODUTOS.map(p => makeRow(p,'conveniencia')).join('');
+
+  // recalc all
+  [...COMBUSTIVEIS,...CONV_PRODUTOS].forEach(p => { calcDiff(p,'combustivel'); calcDiff(p,'conveniencia'); });
+}
+
+function calcDiff(prod, tipo) {
+  const pc = parseFloat(document.getElementById(`p_${tipo}_${prod}_pc`)?.value)||0;
+  const c1 = parseFloat(document.getElementById(`p_${tipo}_${prod}_c1`)?.value)||0;
+  const c2 = parseFloat(document.getElementById(`p_${tipo}_${prod}_c2`)?.value)||0;
+  const el = document.getElementById(`diff_${tipo}_${prod}`);
+  if (!el || !pc) return;
+  const comps = [c1,c2].filter(v=>v>0);
+  if (!comps.length) { el.innerHTML='—'; return; }
+  const minC = Math.min(...comps);
+  const diff = pc - minC;
+  if (Math.abs(diff)<0.005) el.innerHTML='<span style="color:var(--muted)">= Par</span>';
+  else if (diff>0) el.innerHTML=`<span style="color:var(--red);font-weight:600">▲ +R$${diff.toFixed(2).replace('.',',')}</span>`;
+  else el.innerHTML=`<span style="color:var(--green);font-weight:600">▼ −R$${Math.abs(diff).toFixed(2).replace('.',',')}</span>`;
+}
+
+function saveConcNome() {
+  const n1 = document.getElementById('cn1').value || 'Concorrente 1';
+  const n2 = document.getElementById('cn2').value || 'Concorrente 2';
+  ['ch1','ch1b'].forEach(id => document.getElementById(id).textContent=n1);
+  ['ch2','ch2b'].forEach(id => document.getElementById(id).textContent=n2);
+}
+
+async function salvarPrecos() {
+  const btn = document.getElementById('preco-btn');
+  btn.disabled=true; btn.textContent='Salvando...';
+  setSyncing(true);
+  const n1 = document.getElementById('cn1').value;
+  const n2 = document.getElementById('cn2').value;
+  const rows = [];
+  const todayStr = today();
+  [...COMBUSTIVEIS,...CONV_PRODUTOS].forEach(prod => {
+    ['combustivel','conveniencia'].forEach(tipo => {
+      const pc = parseFloat(document.getElementById(`p_${tipo}_${prod}_pc`)?.value)||null;
+      const c1 = parseFloat(document.getElementById(`p_${tipo}_${prod}_c1`)?.value)||null;
+      const c2 = parseFloat(document.getElementById(`p_${tipo}_${prod}_c2`)?.value)||null;
+      if (pc||c1||c2) rows.push({ data:todayStr, produto:prod, tipo, preco_posto:pc, preco_conc1:c1, preco_conc2:c2, nome_conc1:n1, nome_conc2:n2 });
+    });
+  });
+  if (rows.length) await db.from('pesquisa_precos').insert(rows);
+  setSyncing(false);
+  btn.disabled=false; btn.textContent='💾 Salvar Pesquisa de Preços';
+  showToast('✓ Pesquisa de preços salva!');
+}
+
+// ===================== INIT =====================
+(async () => {
+  await checkConnection();
+  loadTurnos();
+})();
+</script>
+
+</body>
+</html>
