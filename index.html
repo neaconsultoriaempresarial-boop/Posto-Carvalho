@@ -183,7 +183,11 @@ input:focus, select:focus, textarea:focus { border-color:var(--yellow); backgrou
     </div>
     <div class="input-row">
       <div><label>Etanol (L)</label><input type="number" id="v-et" placeholder="0" min="0"></div>
-      <div><label>Diesel (L)</label><input type="number" id="v-di" placeholder="0" min="0"></div>
+      <div><label>Diesel Comum (L)</label><input type="number" id="v-di" placeholder="0" min="0"></div>
+    </div>
+    <div class="input-row">
+      <div><label>Diesel S10 (L)</label><input type="number" id="v-dis10" placeholder="0" min="0"></div>
+      <div></div>
     </div>
     <div class="input-group">
       <label>Faturamento Conveniência (R$)</label>
@@ -466,6 +470,7 @@ async function addTurno() {
   const ga = parseFloat(document.getElementById('v-ga').value)||0;
   const et = parseFloat(document.getElementById('v-et').value)||0;
   const di = parseFloat(document.getElementById('v-di').value)||0;
+  const dis10 = parseFloat(document.getElementById('v-dis10').value)||0;
   const conv = parseFloat(document.getElementById('v-conv').value)||0;
   const op = document.getElementById('v-op').value.trim();
   const obs = document.getElementById('v-obs').value.trim();
@@ -474,13 +479,13 @@ async function addTurno() {
   setSyncing(true);
   const { error } = await db.from('turnos').insert([{
     data, turno: document.getElementById('v-turno').value,
-    gas_comum:gc, gas_aditivada:ga, etanol:et, diesel:di,
+    gas_comum:gc, gas_aditivada:ga, etanol:et, diesel:di, diesel_s10:dis10,
     conv_faturamento:conv, operador:op, observacoes:obs
   }]);
   btn.disabled = false; btn.textContent = '＋ Registrar Turno';
   if (error) { setSyncStatus('error','erro'); showToast('Erro ao salvar: ' + error.message); return; }
   setSyncing(false);
-  ['v-gc','v-ga','v-et','v-di','v-conv','v-obs'].forEach(id => document.getElementById(id).value='');
+  ['v-gc','v-ga','v-et','v-di','v-dis10','v-conv','v-obs'].forEach(id => document.getElementById(id).value='');
   showToast('✓ Turno registrado com sucesso!');
   loadTurnos();
 }
@@ -674,7 +679,7 @@ async function salvarObs() {
 }
 
 // ===================== PREÇOS =====================
-const COMBUSTIVEIS = ['Gasolina Comum','Gasolina Aditivada','Etanol','Diesel S10'];
+const COMBUSTIVEIS = ['Gasolina Comum','Gasolina Aditivada','Etanol','Diesel Comum','Diesel S10'];
 const CONV_PRODUTOS = ['Água 500ml','Água 1,5L','Coca-Cola lata','Cerveja lata 350ml','Red Bull 250ml','Monster 473ml','Cigarro Marlboro','Cigarro Lucky Strike','Sorvete picolé','Salgadinho 50g','Óleo Motor 1L'];
 
 let precoCache = {};
